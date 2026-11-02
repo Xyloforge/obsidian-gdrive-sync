@@ -25,6 +25,7 @@ class Device implements LocalStore {
   }
   async read(p: string) { return this.files.get(p)!.slice().buffer as ArrayBuffer; }
   async write(p: string, d: ArrayBuffer) { this.files.set(p, new Uint8Array(d)); }
+  async modifiedTime() { return undefined; }
   async remove(p: string) { this.files.delete(p); }
   async backup() {}
   text(p: string) { return dec.decode(this.files.get(p)); }
@@ -81,6 +82,18 @@ test("drive store: creates folder once, uploads, lists hashes, updates, reads, t
   assert.equal((await s.list()).size, 0);
   const folders = [...g.files.values()].filter((f) => f.mimeType.endsWith("folder"));
   assert.equal(folders.length, 1, "only one sync folder created");
+});
+
+test("drive store keeps the note's last-edited time (new and updated files)", async () => {
+  const g = new FakeGoogle();
+  const edited = Date.UTC(2022, 6, 14, 10, 30, 20);
+  await store(g).write("old.md", buf("v1"), "h1", edited);
+  const other = store(g);
+  await other.list();
+  assert.equal(other.modifiedTime("old.md"), edited);
+  await other.write("old.md", buf("v2"), "h2", edited + 60_000);
+  await other.list();
+  assert.equal(other.modifiedTime("old.md"), edited + 60_000);
 });
 
 test("drive store reuses an existing folder (second device)", async () => {

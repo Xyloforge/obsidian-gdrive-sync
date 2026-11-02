@@ -5,7 +5,10 @@ import { conflictPath, isSafePath } from "./paths.ts";
 export interface LocalStore {
   list(): Promise<Map<string, string>>;
   read(path: string): Promise<ArrayBuffer>;
-  write(path: string, data: ArrayBuffer): Promise<void>;
+  /** `modified` (ms since epoch) is the file's real last-edited time, kept so a synced note doesn't look freshly edited. */
+  write(path: string, data: ArrayBuffer, modified?: number): Promise<void>;
+  /** Last-edited time (ms since epoch) of a local file, if known. */
+  modifiedTime(path: string): Promise<number | undefined>;
   /** Move to trash (recoverable), never hard-delete. */
   remove(path: string): Promise<void>;
   /** Save a copy of the current local version before it is overwritten or removed. */
@@ -16,8 +19,10 @@ export interface LocalStore {
 export interface RemoteStore {
   list(): Promise<Map<string, string>>;
   read(path: string): Promise<ArrayBuffer>;
-  write(path: string, data: ArrayBuffer, hash: string): Promise<void>;
+  write(path: string, data: ArrayBuffer, hash: string, modified?: number): Promise<void>;
   remove(path: string): Promise<void>;
+  /** Last-edited time (ms since epoch) of a remote file as of the last list(), if known. */
+  modifiedTime(path: string): number | undefined;
 }
 
 export interface SyncSummary {
@@ -82,12 +87,12 @@ async function apply(a: Action, ctx: Ctx, s: SyncSummary): Promise<string | unde
     case "forget":
       return undefined;
     case "upload":
-      await remote.write(a.path, await local.read(a.path), a.hash);
+      await remote.write(a.path, await local.read(a.path), a.hash, await local.modifiedTime(a.path));
       s.uploaded.push(a.path);
       return a.hash;
     case "download":
       if (ctx.localHashes.has(a.path)) await local.backup(a.path);
-      await local.write(a.path, await remote.read(a.path));
+      await local.write(a.path, await remote.read(a.path), remote.modifiedTime(a.path));
       s.downloaded.push(a.path);
       return a.hash;
     case "deleteRemote":
@@ -101,8 +106,8 @@ async function apply(a: Action, ctx: Ctx, s: SyncSummary): Promise<string | unde
       return undefined;
     case "conflict":
       // Keep both: remote version goes to a "(conflict …)" copy, local version wins the path.
-      await local.write(conflictPath(a.path, ctx.now), await remote.read(a.path));
-      await remote.write(a.path, await local.read(a.path), a.hash);
+      await local.write(conflictPath(a.path, ctx.now), await remote.read(a.path), remote.modifiedTime(a.path));
+      await remote.write(a.path, await local.read(a.path), a.hash, await local.modifiedTime(a.path));
       s.conflicts.push(a.path);
       return a.hash;
   }

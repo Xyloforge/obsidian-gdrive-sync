@@ -52,6 +52,7 @@ export class GoogleDriveStore implements RemoteStore {
   private readonly sleep: (ms: number) => Promise<void>;
   private folderId = "";
   private ids = new Map<string, string>();
+  private times = new Map<string, number>();
 
   constructor(http: HttpFn, tokens: TokenSource, folderName: string, opts: DriveOptions = {}) {
     this.http = http;
@@ -120,12 +121,20 @@ export class GoogleDriveStore implements RemoteStore {
     const sorted = [...files].sort((a, b) => (a.modifiedTime ?? "").localeCompare(b.modifiedTime ?? ""));
     const ids = new Map<string, string>();
     const hashes = new Map<string, string>();
+    const times = new Map<string, number>();
     for (const f of sorted) {
       ids.set(f.name, f.id);
+      const t = f.modifiedTime ? Date.parse(f.modifiedTime) : NaN;
+      if (!Number.isNaN(t)) times.set(f.name, t);
       hashes.set(f.name, f.appProperties?.sha256 ?? `unknown:${f.id}:${f.modifiedTime}`);
     }
     this.ids = ids;
+    this.times = times;
     return hashes;
+  }
+
+  modifiedTime(path: string): number | undefined {
+    return this.times.get(path);
   }
 
   private idOf(path: string): string {
@@ -139,11 +148,13 @@ export class GoogleDriveStore implements RemoteStore {
     return res.arrayBuffer;
   }
 
-  async write(path: string, data: ArrayBuffer, hash: string): Promise<void> {
+  async write(path: string, data: ArrayBuffer, hash: string, modified?: number): Promise<void> {
     const existing = this.ids.get(path);
+    // Drive keeps the note's real edit time, so other devices can restore it.
+    const time = modified === undefined ? {} : { modifiedTime: new Date(modified).toISOString() };
     const meta = existing
-      ? { appProperties: { sha256: hash } }
-      : { name: path, parents: [await this.ensureFolder()], appProperties: { sha256: hash } };
+      ? { appProperties: { sha256: hash }, ...time }
+      : { name: path, parents: [await this.ensureFolder()], appProperties: { sha256: hash }, ...time };
     const id = data.byteLength > MULTIPART_LIMIT
       ? await this.resumableUpload(path, meta, data, existing)
       : await this.multipartUpload(path, meta, data, existing);

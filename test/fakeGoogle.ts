@@ -113,14 +113,14 @@ export class FakeGoogle {
       if (!id) {
         const f: FakeFile = {
           id: `f${++this.seq}`, name: String(meta.name), parents: meta.parents as string[],
-          mimeType: "application/octet-stream", trashed: false, modifiedTime: this.now(),
+          mimeType: "application/octet-stream", trashed: false, modifiedTime: (meta.modifiedTime as string | undefined) ?? this.now(),
           appProperties: (meta.appProperties ?? {}) as Record<string, string>, data,
         };
         this.files.set(f.id, f);
         return respond(200, { id: f.id });
       }
       const f = this.files.get(id)!;
-      this.files.set(f.id, { ...f, data, modifiedTime: this.now(), appProperties: { ...f.appProperties, ...(meta.appProperties as object) } });
+      this.files.set(f.id, { ...f, data, modifiedTime: (meta.modifiedTime as string | undefined) ?? this.now(), appProperties: { ...f.appProperties, ...(meta.appProperties as object) } });
       return respond(200, { id: f.id });
     }
   }

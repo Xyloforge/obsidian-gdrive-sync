@@ -74,20 +74,27 @@ export class VaultStore implements LocalStore {
     }
   }
 
-  async write(path: string, data: ArrayBuffer): Promise<void> {
+  async write(path: string, data: ArrayBuffer, modified?: number): Promise<void> {
+    const options = modified === undefined ? undefined : { mtime: modified };
     if (this.isSnippet(path)) {
       const dir = snippetDir(this.app.vault.configDir);
       if (!(await this.app.vault.adapter.exists(dir))) await this.app.vault.adapter.mkdir(dir);
-      await this.app.vault.adapter.writeBinary(path, data);
+      await this.app.vault.adapter.writeBinary(path, data, options);
       return;
     }
     const existing = this.app.vault.getAbstractFileByPath(normalizePath(path));
     if (existing instanceof TFile) {
-      await this.app.vault.modifyBinary(existing, data);
+      await this.app.vault.modifyBinary(existing, data, options);
       return;
     }
     await this.ensureParents(path);
-    await this.app.vault.createBinary(normalizePath(path), data);
+    await this.app.vault.createBinary(normalizePath(path), data, options);
+  }
+
+  async modifiedTime(path: string): Promise<number | undefined> {
+    if (this.isSnippet(path)) return (await this.app.vault.adapter.stat(path))?.mtime;
+    const f = this.app.vault.getAbstractFileByPath(normalizePath(path));
+    return f instanceof TFile ? f.stat.mtime : undefined;
   }
 
   /** Uses the user's trash setting (system trash or .trash folder). */

@@ -13,6 +13,7 @@ class MemLocal implements LocalStore {
   files = new Map<string, string>();
   backups: string[] = [];
   trashed: string[] = [];
+  times = new Map<string, number>();
   constructor(init: Record<string, string> = {}) {
     for (const [k, v] of Object.entries(init)) this.files.set(k, v);
   }
@@ -22,7 +23,11 @@ class MemLocal implements LocalStore {
     return out;
   }
   async read(p: string) { return buf(this.files.get(p)!); }
-  async write(p: string, d: ArrayBuffer) { this.files.set(p, dec.decode(d)); }
+  async write(p: string, d: ArrayBuffer, modified?: number) {
+    this.files.set(p, dec.decode(d));
+    if (modified !== undefined) this.times.set(p, modified);
+  }
+  async modifiedTime(p: string) { return this.times.get(p); }
   async remove(p: string) { this.trashed.push(p); this.files.delete(p); }
   async backup(p: string) { this.backups.push(p); }
 }
@@ -30,18 +35,21 @@ class MemLocal implements LocalStore {
 class MemRemote implements RemoteStore {
   files = new Map<string, string>();
   failOn = new Set<string>();
+  times = new Map<string, number>();
   constructor(init: Record<string, string> = {}) {
     for (const [k, v] of Object.entries(init)) this.files.set(k, v);
   }
+  modifiedTime(p: string) { return this.times.get(p); }
   async list() {
     const out = new Map<string, string>();
     for (const [k, v] of this.files) out.set(k, await sha256Hex(buf(v)));
     return out;
   }
   async read(p: string) { return buf(this.files.get(p)!); }
-  async write(p: string, d: ArrayBuffer) {
+  async write(p: string, d: ArrayBuffer, _hash: string, modified?: number) {
     if (this.failOn.has(p)) throw new Error("network down");
     this.files.set(p, dec.decode(d));
+    if (modified !== undefined) this.times.set(p, modified);
   }
   async remove(p: string) { this.files.delete(p); }
 }
@@ -180,4 +188,17 @@ test("conflictPath keeps folder and extension", () => {
   assert.equal(conflictPath("A/B/Note.md", NOW), "A/B/Note (conflict 2026-11-02 1430).md");
   assert.equal(conflictPath("README", NOW), "README (conflict 2026-11-02 1430)");
   assert.equal(conflictPath("a.b/file", NOW), "a.b/file (conflict 2026-11-02 1430)");
+});
+
+// A synced note must keep its real "last edited" time, not the sync time.
+test("runSync keeps last-edited times in both directions", async () => {
+  const edited = new Date(2023, 4, 1, 9, 15).getTime();
+  const remoteEdited = new Date(2021, 1, 3, 4, 5).getTime();
+  const l = new MemLocal({ "up.md": "U" });
+  l.times.set("up.md", edited);
+  const r = new MemRemote({ "down.md": "D" });
+  r.times.set("down.md", remoteEdited);
+  await runSync(l, r, {}, { now: NOW });
+  assert.equal(r.times.get("up.md"), edited);
+  assert.equal(l.times.get("down.md"), remoteEdited);
 });
