@@ -1,0 +1,17 @@
+{
+  "name": "gdrive-sync",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "test": "node --test test/*.test.ts",
+    "deploy": "npm run build && mkdir -p \"$VAULT/.obsidian/plugins/gdrive-sync\" && cp main.js manifest.json styles.css \"$VAULT/.obsidian/plugins/gdrive-sync/\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.25.12",
+    "obsidian": "^1.14.4",
+    "typescript": "^5.9.3"
+  }
+}

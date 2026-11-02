@@ -1,0 +1,30 @@
+/* Small, non-blocking sync indicator */
+.gds-pill {
+  position: fixed;
+  right: 14px;
+  bottom: 40px;
+  z-index: var(--layer-notice, 40);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.is-mobile .gds-pill { bottom: calc(var(--safe-area-inset-bottom, 0px) + 72px); right: 12px; }
+.gds-pill.is-visible { opacity: 1; transform: none; }
+.gds-pill.is-done { color: var(--color-green); }
+.gds-pill.is-error { color: var(--color-red); }
+.gds-pill svg { width: 13px; height: 13px; }
+.gds-pill.is-syncing svg { animation: gds-spin 1s linear infinite; }
+@keyframes gds-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .gds-pill.is-syncing svg { animation: none; } }

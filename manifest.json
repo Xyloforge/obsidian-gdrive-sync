@@ -1,0 +1,9 @@
+{
+  "id": "gdrive-sync",
+  "name": "Xyloforge Notes Sync",
+  "version": "0.2.0",
+  "minAppVersion": "1.5.0",
+  "description": "Sync this vault with a folder in your Google Drive (desktop and mobile).",
+  "author": "rong",
+  "isDesktopOnly": false
+}
