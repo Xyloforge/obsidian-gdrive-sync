@@ -59,10 +59,19 @@ export async function pollForRefreshToken(
   for (let i = 0; i < tries && !opts.isCancelled(); i++) {
     await opts.sleep(interval * 1000);
     if (opts.isCancelled()) break;
-    const res = await http({
-      url: TOKEN_URL, method: "POST", contentType: FORM,
-      body: formBody({ client_id: c.clientId, client_secret: c.clientSecret, device_code: dc.deviceCode, grant_type: DEVICE_GRANT }),
-    });
+    let res;
+    try {
+      res = await http({
+        url: TOKEN_URL, method: "POST", contentType: FORM,
+        body: formBody({ client_id: c.clientId, client_secret: c.clientSecret, device_code: dc.deviceCode, grant_type: DEVICE_GRANT }),
+      });
+    } catch {
+      // No network. On Android this is normal while the user approves in the
+      // browser: the phone cuts network for apps in the background. Keep
+      // waiting; the next check works once they return to Obsidian.
+      continue;
+    }
+    if (res.status >= 500) continue; // Google hiccup: try again next interval
     const j = res.json as Record<string, unknown>;
     if (res.status === 200 && typeof j.refresh_token === "string") return j.refresh_token;
     if (j.error === "authorization_pending") continue;

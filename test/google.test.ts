@@ -42,6 +42,22 @@ test("device sign-in: shows code, waits for approval, returns refresh token", as
   assert.equal(token, "REFRESH");
 });
 
+// On Android the user approves in the browser, so Obsidian is in the
+// background and the phone may cut its network ("Unable to resolve host").
+// Polling must keep going until the user comes back.
+test("device sign-in survives network errors while the app is in the background", async () => {
+  const g = new FakeGoogle();
+  g.pendingPolls = 1;
+  const dc = await startDeviceFlow(g.http, creds);
+  let offline = 3;
+  const flaky: typeof g.http = async (req) => {
+    if (req.url.includes("/token") && offline-- > 0) throw new Error("Unable to resolve host oauth2.googleapis.com");
+    return g.http(req);
+  };
+  const token = await pollForRefreshToken(flaky, creds, dc, { sleep: noSleep, isCancelled: () => false });
+  assert.equal(token, "REFRESH");
+});
+
 test("device sign-in can be cancelled", async () => {
   const g = new FakeGoogle();
   g.pendingPolls = 100;
