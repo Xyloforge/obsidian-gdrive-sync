@@ -1,6 +1,7 @@
 import { debounce, Notice, Plugin, requestUrl, TFile, type TAbstractFile } from "obsidian";
 import { compressImage, shouldCompress } from "./compress.ts";
 import { SyncIndicator } from "./indicator.ts";
+import { registerCardActions } from "./cardActions.ts";
 import { AuthExpiredError, TokenProvider } from "./auth.ts";
 import { GoogleDriveStore } from "./drive.ts";
 import { MassDeleteError, runSync, type SyncSummary } from "./engine.ts";
@@ -77,6 +78,7 @@ export default class GDriveSyncPlugin extends Plugin implements SettingsHost {
 
     this.addSettingTab(new SyncSettingTab(this.app, this, this));
     this.indicator = new SyncIndicator();
+    registerCardActions(this, () => this.settings.attachmentFolder);
     this.statusEl = this.addStatusBarItem();
     this.setStatus(this.lastSync ? `Drive: synced ${this.lastSync}` : "Drive: not synced");
     this.addRibbonIcon("refresh-cw", "Sync with Google Drive", () => void this.syncNow(true));
